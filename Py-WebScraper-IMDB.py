@@ -1,101 +1,103 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import time
+import os
 
-# Hedef URL (IMDB Top 250)
-url = 'https://www.imdb.com/chart/top/'
+# --- AYARLAR ---
+URL = 'https://www.imdb.com/chart/top/'
+EXCEL_FILE = "IMDB_Top_Movies.xlsx"
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.5"
+# Tarayıcı Taklidi Yapan Başlıklar
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9"
 }
 
-def main():
-    print("🎬 IMDB verileri çekiliyor... Lütfen bekleyin.")
-    
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_banner():
+    print("""
+    ██╗███╗   ███╗██████╗ ██████╗ 
+    ██║████╗ ████║██╔══██╗██╔══██╗
+    ██║██╔████╔██║██║  ██║██████╔╝
+    ██║██║╚██╔╝██║██║  ██║██╔══██╗
+    ██║██║ ╚═╝ ██║██████╔╝██████╔╝
+    ╚═╝╚═╝     ╚═╝╚═════╝ ╚═════╝ 
+      --- Python Web Scraper ---
+    """)
+
+def fetch_data():
+    print("⏳ IMDB sunucularına bağlanılıyor...")
     try:
-        response = requests.get(url, headers=headers)
-        
+        response = requests.get(URL, headers=HEADERS)
         if response.status_code != 200:
-            print("Hata: Siteye erişilemedi!")
-            return
-
-        soup = BeautifulSoup(response.content, 'html.parser')
+            print(f"❌ Hata: Bağlantı reddedildi! (Kod: {response.status_code})")
+            return None
         
-        movie_titles = []
-        movie_years = []
-        movie_ratings = []
-        
-        # Filmleri bul
-        movies = soup.find_all('li', class_='ipc-metadata-list-summary-item')
-        print(f"Toplam {len(movies)} film bulundu. İşleniyor...")
-
-        for movie in movies:
-            try:
-                # 1. Başlık Çekme (Hata Korumalı)
-                title_tag = movie.find('h3', class_='ipc-title__text')
-                if title_tag:
-                    raw_title = title_tag.text
-                    # Eğer "1. Film" formatındaysa böl, değilse olduğu gibi al
-                    if '. ' in raw_title:
-                        title = raw_title.split('. ', 1)[1]
-                    else:
-                        title = raw_title
-                else:
-                    title = "Bilinmiyor"
-                
-                # 2. Yıl Bilgisi
-                metadata = movie.find_all('span', class_='cli-title-metadata-item')
-                if len(metadata) > 0:
-                    year = metadata[0].text
-                else:
-                    year = "0000"
-                
-                # 3. Puan Çekme
-                rating_tag = movie.find('span', class_='ipc-rating-star--rating')
-                # Puan bazen boş gelebilir, kontrol edelim
-                if rating_tag:
-                    rating = rating_tag.text.strip()
-                else:
-                    rating = "0.0"
-
-                # Listelere ekle
-                movie_titles.append(title)
-                movie_years.append(year)
-                movie_ratings.append(rating)
-
-            except Exception as e:
-                # Tek bir filmde hata olursa program çökmesin, o filmi atlasın
-                print(f"Bir satır atlandı: {e}")
-                continue
-
-        # --- EXCEL'E AKTARMA ---
-        if len(movie_titles) > 0:
-            df = pd.DataFrame({
-                'Film Adı': movie_titles,
-                'Yıl': movie_years,
-                'Puan': movie_ratings
-            })
-
-            # Puanı sayıya çevirmeyi dene (Hata verirse boşver)
-            try:
-                df['Puan'] = df['Puan'].astype(float)
-            except:
-                pass
-            
-            print("\n------------------------------------------------")
-            print("📊 İSTATİSTİKLER")
-            print(f"Listelenen Film Sayısı: {len(df)}")
-            print("------------------------------------------------")
-
-            file_name = "IMDB_Listesi.xlsx"
-            df.to_excel(file_name, index=False)
-            print(f"✅ Başarılı! Veriler '{file_name}' dosyasına kaydedildi.")
-        else:
-            print("❌ Hiç veri çekilemedi. Site yapısı değişmiş olabilir.")
-
+        print("✅ Bağlantı başarılı! Veriler işleniyor...")
+        return response.content
     except Exception as e:
-        print(f"Genel bir hata oluştu: {e}")
+        print(f"❌ Kritik Hata: {e}")
+        return None
+
+def parse_html(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    movie_list = []
+    
+    # IMDB Liste Öğelerini Bul
+    items = soup.find_all('li', class_='ipc-metadata-list-summary-item')
+    
+    for item in items:
+        try:
+            # Başlık
+            title_tag = item.find('h3', class_='ipc-title__text')
+            title = title_tag.text.split('. ', 1)[1] if title_tag and '. ' in title_tag.text else title_tag.text
+
+            # Yıl ve Süre (Metadata)
+            metadata = item.find_all('span', class_='cli-title-metadata-item')
+            year = metadata[0].text if metadata else "N/A"
+            duration = metadata[1].text if len(metadata) > 1 else "N/A"
+
+            # Puan
+            rating_tag = item.find('span', class_='ipc-rating-star--rating')
+            rating = float(rating_tag.text) if rating_tag else 0.0
+
+            movie_list.append({
+                "Film Adı": title,
+                "Yıl": year,
+                "Süre": duration,
+                "IMDB Puanı": rating
+            })
+        except Exception:
+            continue
+            
+    return movie_list
+
+def save_to_excel(data):
+    if not data:
+        print("⚠️ Kaydedilecek veri bulunamadı.")
+        return
+
+    df = pd.DataFrame(data)
+    
+    # Excel'e yaz
+    with pd.ExcelWriter(EXCEL_FILE, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='IMDB Top List')
+        
+    print(f"\n🎉 İŞLEM TAMAMLANDI!")
+    print(f"📊 Toplam {len(data)} film çekildi.")
+    print(f"💾 Dosya oluşturuldu: {EXCEL_FILE}")
+    print("-" * 40)
+
+def main():
+    clear_screen()
+    print_banner()
+    html = fetch_data()
+    if html:
+        data = parse_html(html)
+        save_to_excel(data)
 
 if __name__ == "__main__":
     main()
