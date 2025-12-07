@@ -55,10 +55,11 @@ python Py-WebScraper-IMDB.py
 
 ## 📊 Örnek Çıktı
 Program çalıştırıldığında proje klasöründe IMDB_Top_Movies.xlsx adında bir dosya oluşur:
+[Görsel](1.png)
 
 ## 👤 Geliştirici
 Arda Yiğit
-🐙 GitHub: @ygtarda
-💼 LinkedIn: Arda Yiğit
+* 🐙 GitHub: [ygtarda](https://github.com/ygtarda)
+* 💼 LinkedIn: [Arda Yiğit](https://www.linkedin.com/in/arda-yigit)
 ---
 Bu proje eğitim amaçlıdır. Veri çekme işlemleri site politikalarına uygun yapılmalıdır.
